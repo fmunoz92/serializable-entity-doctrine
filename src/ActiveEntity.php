@@ -21,18 +21,22 @@ trait ActiveEntity
         $this->doctrineClassMetadata = $classMetadata;
     }
 
-    private function set($field, $args)
+    public function set($field, $args)
     {
         if (isset($this->doctrineClassMetadata->fieldMappings[$field])) {
-            $this->$field = $args[0];
+
+            if ($this->$field instanceof \DateTime &&  is_string($args[0]))
+                $this->$field = new \DateTime($args[0]);
+            else
+                $this->$field = $args[0];
         } else if (isset($this->doctrineClassMetadata->associationMappings[$field]) &&
                  $this->doctrineClassMetadata->associationMappings[$field]['type'] & ClassMetadata::TO_ONE) {
 
             $assoc = $this->doctrineClassMetadata->associationMappings[$field];
             if (!($args[0] instanceof $assoc['targetEntity'])) {
-                throw new \InvalidArgumentException(
-                    "Expected entity of type '".$assoc['targetEntity']."'"
-                );
+                $value = $this->doctrineEntityManager->getReference($assoc['targetEntity'], $args[0]);
+                $this->$field = $value;
+                return;
             }
 
             if ($assoc['type'] & ClassMetadata::ONE_TO_ONE && !$assoc['isOwning']) {
@@ -41,12 +45,16 @@ trait ActiveEntity
             }
 
             $this->$field = $args[0];
-        } else {
+        } 
+        else if($field == "id") {
+            //pass
+        }
+        else {
             throw new \BadMethodCallException("no field with name '".$field."' exists on '".$this->doctrineClassMetadata->name."'");
         }
     }
     
-    private function get($field)
+    public function get($field)
     {
         if ( (isset($this->doctrineClassMetadata->fieldMappings[$field]) && $this->doctrineClassMetadata->fieldMappings[$field]['type'] != "boolean") ||
             isset($this->doctrineClassMetadata->associationMappings[$field])) {
@@ -56,7 +64,7 @@ trait ActiveEntity
         }
     }
     
-    private function add($field, $args)
+    public function add($field, $args)
     {
         if (isset($this->doctrineClassMetadata->associationMappings[$field]) &&
             $this->doctrineClassMetadata->associationMappings[$field]['type'] & ClassMetadata::TO_MANY) {
@@ -122,6 +130,7 @@ trait ActiveEntity
             throw new \BadMethodCallException("There is no method ".$method." on ".$this->doctrineClassMetadata->name);
         }
     }
+
     
     public function persist()
     {
@@ -133,6 +142,22 @@ trait ActiveEntity
         $this->doctrineEntityManager->remove($this);
     }
     
+    public function update(array $data = array())
+    {        
+        foreach ($data AS $k => $v) {
+            $this->set($k, array($v));
+        }
+        return $this;
+    }
+        
+    public function updateFromJson($data) {
+        return $this->update(json_decode($data, true));
+    }
+
+    static public function createFromJson($data) {
+        return self::create(json_decode($data, true));
+    }
+
     static public function create(array $data = array())
     {
         $instance = new static();
@@ -148,6 +173,12 @@ trait ActiveEntity
     {
         $class = get_called_class();
         return ActiveEntityRegistry::getClassManager($class)->createQueryBuilder($rootAlias);
+    }
+
+    static public function createQuery($alias = 'r')
+    {
+        $class = get_called_class();
+        return ActiveEntityRegistry::getClassManager($class)->createQueryBuilder($alias)->select($alias)->from($class, $alias)->getQuery();
     }
     
     static public function find($id)
