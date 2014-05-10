@@ -1,0 +1,19 @@
+{
+    "name": "fmunoz92/SerializableEntityDoctrine",
+    "type": "library",
+    "license": "MIT",
+    "description": "https://gist.github.com/beberlei/1034079",    
+    "require": {
+    },
+    "authors": [
+        {
+            "name": "Facundo Munoz",
+            "email": "facuu.munoz@gmail.com"
+        }
+    ],    
+    "autoload": {
+        "classmap": [
+            "src"
+        ]
+    }  
+}
