@@ -16,7 +16,7 @@ trait SerializableEntity
         $data = array();
         foreach ($class->fieldMappings as $field => $mapping) {
             $value = $class->reflFields[$field]->getValue($entity);
-            $field = Inflector::tableize($field);
+            //$field = Inflector::tableize($field);
             if ($value instanceof \DateTime) {
                 $data[$field] = $value->format(\DateTime::ATOM);
             } else if (is_object($value)) {
@@ -26,12 +26,16 @@ trait SerializableEntity
             }
         }
         foreach ($class->associationMappings as $field => $mapping) {
-            $key = Inflector::tableize($field);
+            //$key = Inflector::tableize($field);
+            $key = $field;
             if ($mapping['isCascadeDetach']) {
                 $data[$key] = self::serializeEntity( $class->reflFields[$field]->getValue($entity) );
             } else if ($mapping['isOwningSide'] && $mapping['type'] & ClassMetadata::TO_ONE) {
                 // if its not detached to but there is an owning side to one entity at least reflect the identifier.
-                $data[$key] = $em->getUnitOfWork()->getEntityIdentifier( $class->reflFields[$field]->getValue($entity) );
+                if(!is_null($class->reflFields[$field]->getValue($entity)))
+                    $data[$key] = $em->getUnitOfWork()->getEntityIdentifier( $class->reflFields[$field]->getValue($entity) );
+                else
+                    $data[$key] = null;
             }
         }
         return $data;
@@ -150,10 +154,12 @@ trait ActiveEntity
     {
         if (isset($this->doctrineClassMetadata->fieldMappings[$field])) {
 
-            if ($this->$field instanceof \DateTime &&  is_string($args[0]))
+            if ($this->$field instanceof \DateTime &&  is_string($args[0])){
                 $this->$field = new \DateTime($args[0]);
+            }
             else
                 $this->$field = $args[0];
+
         } else if (isset($this->doctrineClassMetadata->associationMappings[$field]) &&
                  $this->doctrineClassMetadata->associationMappings[$field]['type'] & ClassMetadata::TO_ONE) {
 
@@ -270,7 +276,8 @@ trait ActiveEntity
     public function update(array $data = array())
     {        
         foreach ($data AS $k => $v) {
-            $this->set($k, array($v));
+            if(!is_null($v))
+                $this->set($k, array($v));
         }
         return $this;
     }
